@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spreadsheet Input Leads</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1c2430;--mu:#657083;--bd:#dde2ea;--ac:#2563eb;--acx:#fff;--wr:#b45309;--ok:#15803d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b212b;--tx:#e8ecf2;--mu:#98a3b5;--bd:#2d3644;--ac:#4f8bff;--acx:#08101f;--wr:#fbbf24;--ok:#4ade80}}
+:root[data-theme="dark"]{--bg:#12161c;--card:#1b212b;--tx:#e8ecf2;--mu:#98a3b5;--bd:#2d3644;--ac:#4f8bff;--acx:#08101f;--wr:#fbbf24;--ok:#4ade80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}
+@media(max-width:860px){.wrap{grid-template-columns:1fr}}
+h1{font-size:19px;margin:0 0 2px}
+.sub{color:var(--mu);font-size:13px;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.f.w2{grid-column:span 2}
+@media(max-width:480px){.f.w2{grid-column:span 1}}
+label{display:block;font-size:12px;color:var(--mu);margin-bottom:3px}
+label b{color:var(--ac);font-weight:600}
+input,select,textarea{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ac);outline-offset:-1px}
+.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+@media(max-width:860px){.side{position:static}}
+.chips{display:flex;flex-wrap:wrap;gap:5px;max-height:190px;overflow:auto;margin-bottom:10px}
+.chip{font-size:12px;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:2px 7px}
+.chip i{color:var(--mu);font-style:normal}
+.warn{color:var(--wr);font-size:13px;margin:0 0 8px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:9px 14px;cursor:pointer}
+button.p{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:600}
+textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;white-space:pre;overflow:auto}
+.hint{font-size:12px;color:var(--mu);margin:6px 0 0}
+.ok{color:var(--ok)}
+.hist{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>Input Leads</h1>
+    <p class="sub">Isi form, salin satu baris, lalu paste di sheet SOCIAL MEDIA SCRAPING pada <b>kolom F</b> (kolom E Leads ID tidak tersentuh).</p>
+    <div id="form"></div>
+  </div>
+  <div class="side">
+    <div class="card">
+      <h2>Baris untuk dipaste (F → AV)</h2>
+      <div id="warn" class="warn"></div>
+      <div class="chips" id="chips"></div>
+      <textarea id="out" rows="3" readonly></textarea>
+      <div class="btns" style="margin-top:10px">
+        <button class="p" id="add">Salin &amp; tambah ke daftar</button>
+        <button id="copy1">Salin saja</button>
+        <button id="clr">Kosongkan</button>
+      </div>
+      <p class="hint" id="msg"></p>
+    </div>
+    <div class="card">
+      <div class="hist"><h2 style="margin:0">Daftar sesi ini (<span id="cnt">0</span>)</h2>
+        <div class="btns"><button id="copyAll">Salin semua</button><button id="clrAll">Hapus</button></div></div>
+      <p class="hint" style="margin:0">Tiap baris = 1 lead. "Salin semua" memasukkan banyak baris sekaligus, paste sekali di baris kosong pertama.</p>
+    </div>
+  </div>
+</div>
+<script>
+// ---- Tabel prioritas (District → region, priority) ----
+const REF={};
+"BANDUNG,SEMARANG,SOLO,YOGYAKARTA:CWJ:P0;BALIKPAPAN,MAKASSAR,SAMARINDA:EI:P0;BALI,MALANG,SURABAYA:EJBN:P0;BEKASI,BOGOR,CENTRAL JAKARTA,DEPOK,EAST JAKARTA,NORTH JAKARTA,SOUTH JAKARTA,TANGERANG,WEST JAKARTA:JABODETABEK:P0;BANDAR LAMPUNG,BATAM,MEDAN,PALEMBANG:SUMATRA:P0;KARAWANG:CWJ:P1;BANJARMASIN,PALANGKARAYA,PONTIANAK:EI:P1;PADANG,PEKANBARU:SUMATRA:P1;CILACAP,CIREBON,GARUT,MAGELANG,MOJOKERTO,PEKALONGAN,PURWAKARTA,PURWOKERTO,SUKABUMI,SUMEDANG,TASIKMALAYA,TEGAL:CWJ:P2;BERAU,JAYAPURA,MANADO,PALU:EI:P2;BANYUWANGI,JEMBER,KEDIRI,MADIUN,MATARAM,PASURUAN:EJBN:P2;SERANG:JABODETABEK:P2;BANDA ACEH,BUKIT TINGGI,JAMBI,TANJUNGPINANG:SUMATRA:P2"
+.split(";").forEach(g=>{const[a,r,p]=g.split(":");a.split(",").forEach(c=>REF[c]=[r,p]);});
+const ALIAS={"JAKARTA SELATAN":"SOUTH JAKARTA","JAKARTA PUSAT":"CENTRAL JAKARTA","JAKARTA UTARA":"NORTH JAKARTA","JAKARTA BARAT":"WEST JAKARTA","JAKARTA TIMUR":"EAST JAKARTA","BADUNG":"BALI","DENPASAR":"BALI","TABANAN":"BALI"};
+const CITIES=["Jakarta Selatan","Jakarta Pusat","Jakarta Utara","Jakarta Barat","Jakarta Timur","Badung","Denpasar","Tabanan","Sidoarjo","Gowa","Banjar Baru","Batu"].concat(Object.keys(REF).filter(k=>!/JAKARTA|^BALI$/.test(k)).map(k=>k.replace(/\w\S*/g,w=>w[0]+w.slice(1).toLowerCase())));
+
+// ---- Definisi field: [key, label, type, options/default, section, wide] ----
+const SEC={a:"Info lead",b:"Grab & Shopee",c:"Google & sosmed",d:"Lokasi",e:"Validasi & review"};
+const FIELDS=[
+["src","Source (F)","sel",["Tiktok","Instagram","Website","Local Lead"],"a"],
+["scr","Scraper Name (G)","sel",["Dzaki","Uca","Ivena","Raihan","Pipit"],"a"],
+["date","Date Posting (H)","date",0,"a"],
+["week","Week (I, otomatis)","txt",0,"a"],
+["year","Year (J, otomatis)","txt",0,"a"],
+["lsrc","Source (L)","sel",["ME Scraping (Instagram/Tiktok)","ME Scraping - Premium Leads","ME Scraping (Gmaps)"],"a"],
+["name","Restaurant Name (N) *","txt",0,"a",1],
+["gmaps","Link Gmaps (K)","txt",0,"a",1],
+["grabid","Grab ID (O)","txt",0,"b"],["grablink","Grab Link (P)","txt",0,"b"],["grabr","Grab Rating (Q)","txt",0,"b"],["grabrev","Grab Review (R)","txt",0,"b"],
+["shid","Shopee ID (S)","txt",0,"b"],["shlink","Shopee Link (T)","txt",0,"b"],["shr","Shopee Rating (U)","txt",0,"b"],["shrev","Shopee Review (V)","txt",0,"b"],
+["gr","Google Rating (W)","txt",0,"c"],["grev","Google Review (X)","txt",0,"c"],
+["slink","Source Link (Y)","txt",0,"c",1],["acct","IG/Tiktok Account (Z)","txt",0,"c",1],["fol","Followers (AA)","txt",0,"c"],
+["city","City (AB) *","city",0,"d"],["reg","Region (AC, otomatis)","txt",0,"d"],["prio","Priority (M, otomatis)","sel",["","P0","P1","P2"],"d"],
+["coord","Koordinat (AE+AF) — paste dari Gmaps","txt",0,"d",1],["addr","Address (AD)","txt",0,"d",1],
+["sanity","Sanity Check Vendor (AG)","sel",["Virgin","","Existing"],"e"],
+["area","Area leads (AN)","sel",["","Blok M","Gading Serpong","PIK","Kelapa Gading"],"e"],
+["cat","Kategori makanan (AP)","sel",["","COFFEE_SHOP","ANEKA_NASI","BURGER_SANDWICH_STEAK","JAPANESE","ROTI","ANEKA_AYAM_BEBEK","SWEETS_DESSERTS","SNACKS_JAJANAN","SEAFOOD","PIZZA_PASTA","CHINESE","KOREAN","MINUMAN","SOTO_BAKSO_SOP","BAKMIE","SATE","HEALTHY_FOOD","FASTFOOD","THAI","INDIAN_FOOD","MIDDLE_EASTERN"],"e"],
+["lrd","Last review date (AT)","date",0,"e"],
+["lplat","Review Platform (AU)","sel",["","Google Maps","Instagram Tagged Photo","Instagram Highlight","Threads","N/A"],"e"],
+["lrlink","Review Link (AV)","txt",0,"e",1]
+];
+// Urutan kolom F → AV (null = kolom dibiarkan kosong)
+const ORDER=["src","scr","date","week","year","gmaps","lsrc","prio","name","grabid","grablink","grabr","grabrev","shid","shlink","shr","shrev","gr","grev","slink","acct","fol","city","reg","addr","lat","lng","sanity",null,null,null,null,null,null,"area",null,"cat",null,null,null,"lrd","lplat","lrlink"];
+const NA=["grabid","grablink","shid","shlink"];
+const STICKY=["src","scr","date","week","year","lsrc","sanity"];
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const $=id=>document.getElementById(id);
+let hist=[];
+
+// ---- Bangun form ----
+const form=$("form");
+Object.keys(SEC).forEach(s=>{
+  const card=document.createElement("div");card.className="card";
+  card.innerHTML="<h2>"+SEC[s]+"</h2>";
+  const g=document.createElement("div");g.className="grid";
+  FIELDS.filter(f=>f[4]===s).forEach(([k,l,t,o,,w])=>{
+    const d=document.createElement("div");d.className="f"+(w?" w2":"");
+    const lb=document.createElement("label");lb.htmlFor=k;lb.textContent=l;d.appendChild(lb);
+    let el;
+    if(t==="sel"){el=document.createElement("select");o.forEach(v=>{const op=document.createElement("option");op.value=v;op.textContent=v||"—";el.appendChild(op);});}
+    else{el=document.createElement("input");el.type=t==="date"?"date":"text";el.autocomplete="off";if(t==="city")el.setAttribute("list","cl");}
+    el.id=k;d.appendChild(el);g.appendChild(d);
+  });
+  card.appendChild(g);form.appendChild(card);
+});
+const dl=document.createElement("datalist");dl.id="cl";CITIES.forEach(c=>{const o=document.createElement("option");o.value=c;dl.appendChild(o);});document.body.appendChild(dl);
+
+// ---- Penyimpanan ringan (opsional) ----
+function load(){try{const s=JSON.parse(localStorage.getItem("leads_sticky")||"{}");STICKY.forEach(k=>{if(s[k]!==undefined)$(k).value=s[k];});hist=JSON.parse(localStorage.getItem("leads_hist")||"[]");}catch(e){}}
+function save(){try{const s={};STICKY.forEach(k=>s[k]=$(k).value);localStorage.setItem("leads_sticky",JSON.stringify(s));localStorage.setItem("leads_hist",JSON.stringify(hist));}catch(e){}}
+
+// ---- Logika otomatis ----
+function onDate(){const v=$("date").value;if(!v)return;const[y,m,d]=v.split("-").map(Number);$("year").value=y;$("week").value="W"+Math.ceil(d/7)+" "+MON[m-1];}
+function onCity(){const c=$("city").value.trim().toUpperCase();const k=ALIAS[c]||c;const r=REF[k];
+  if(r){$("reg").value=r[0];$("prio").value=r[1];}
+}
+function coords(){const m=$("coord").value.match(/-?\d+(?:\.\d+)?/g);return m&&m.length>=2?[m[0],m[1]]:null;}
+const clean=s=>String(s==null?"":s).replace(/[\t\r\n]+/g," ").trim();
+
+function row(){
+  const v={};FIELDS.forEach(f=>v[f[0]]=clean($(f[0]).value));
+  const c=coords();v.lat=c?c[0]:"";v.lng=c?c[1]:"";
+  NA.forEach(k=>{if(!v[k])v[k]="N/A";});
+  return{v,cells:ORDER.map(k=>k?v[k]:"")};
+}
+function colName(i){let n=i+6,s="";while(n>0){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26);}return s;}
+
+function render(){
+  const{v,cells}=row();
+  $("out").value=cells.join("\t");
+  const w=[];
+  if(!v.name)w.push("Restaurant Name belum diisi");
+  if(!v.city)w.push("City belum diisi");
+  else if(!REF[ALIAS[v.city.toUpperCase()]||v.city.toUpperCase()])w.push("Kota tidak ada di tabel Priority — Region & Priority isi manual");
+  if(v.coord&&!coords())w.push("Koordinat tidak terbaca (butuh 2 angka)");
+  $("warn").textContent=w.join(" • ");
+  $("chips").innerHTML="";
+  cells.forEach((c,i)=>{if(c&&c!=="N/A"){const s=document.createElement("span");s.className="chip";const k=document.createElement("i");k.textContent=colName(i)+" ";s.appendChild(k);s.appendChild(document.createTextNode(c.length>28?c.slice(0,27)+"…":c));$("chips").appendChild(s);}});
+  $("cnt").textContent=hist.length;
+}
+
+async function copy(text){
+  try{await navigator.clipboard.writeText(text);return true;}catch(e){}
+  try{const t=document.createElement("textarea");t.value=text;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.select();const ok=document.execCommand("copy");document.body.removeChild(t);return ok;}catch(e){return false;}
+}
+function say(t,ok){const m=$("msg");m.textContent=t;m.className="hint"+(ok?" ok":"");}
+
+function clearForm(){FIELDS.forEach(f=>{if(!STICKY.includes(f[0])){$(f[0]).value=f[2]==="sel"?(f[0]==="sanity"?"Virgin":f[3][0]):"";}});render();$("name").focus();}
+
+$("copy1").onclick=async()=>{const ok=await copy($("out").value);say(ok?"Tersalin. Paste di kolom F pada baris kosong.":"Gagal menyalin otomatis — pilih teks di kotak lalu Ctrl+C.",ok);};
+$("add").onclick=async()=>{
+  const{v,cells}=row();
+  if(!v.name||!v.city){say("Isi Restaurant Name dan City dulu.",false);return;}
+  const line=cells.join("\t");const ok=await copy(line);
+  hist.push(line);save();clearForm();
+  say(ok?"Tersalin & masuk daftar. Form dikosongkan (Source, Scraper, tanggal tetap)."  :"Masuk daftar, tapi salin otomatis gagal — pakai 'Salin semua'.",ok);
+};
+$("clr").onclick=()=>{clearForm();say("",false);};
+$("copyAll").onclick=async()=>{if(!hist.length){say("Daftar masih kosong.",false);return;}const ok=await copy(hist.join("\n"));say(ok?hist.length+" baris tersalin.":"Gagal menyalin otomatis.",ok);};
+$("clrAll").onclick=()=>{if(hist.length&&confirm("Hapus semua baris di daftar?")){hist=[];save();render();say("Daftar dihapus.",false);}};
+
+form.addEventListener("input",e=>{
+  if(e.target.id==="date")onDate();
+  if(e.target.id==="city")onCity();
+  if(STICKY.includes(e.target.id))save();
+  render();
+});
+load();if(!$("sanity").value)$("sanity").value="Virgin";
+if(!$("date").value){$("date").value=new Date().toISOString().slice(0,10);}
+onDate();render();
+</script>
+</body>
+</html>

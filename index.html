@@ -46,6 +46,12 @@ textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;white-
 @media(prefers-color-scheme:dark){.gmaps-badge.ok{background:#064e3b;color:#6ee7b7}.gmaps-badge.err{background:#7f1d1d;color:#fca5a5}}
 :root[data-theme="dark"] .gmaps-badge.ok{background:#064e3b;color:#6ee7b7}
 :root[data-theme="dark"] .gmaps-badge.err{background:#7f1d1d;color:#fca5a5}
+.lbl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
+.lbl-row label{margin-bottom:0}
+.lock-btn{background:none;border:none;padding:0 2px;cursor:pointer;font-size:13px;line-height:1;border-radius:4px;color:var(--mu);opacity:.55;transition:opacity .15s}
+.lock-btn:hover{opacity:1}
+.lock-btn.locked{opacity:1;color:var(--ac)}
+input.locked-field,select.locked-field{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 6%,var(--bg))}
 </style>
 </head>
 <body>
@@ -111,9 +117,11 @@ const FIELDS=[
 const ORDER=["src","scr","date","week","year","gmaps","lsrc","prio","name","grabid","grablink","grabr","grabrev","shid","shlink","shr","shrev","gr","grev","slink","acct","fol","city","reg","addr","lat","lng","sanity",null,null,null,null,null,null,"area",null,"cat",null,null,null,"lrd","lplat","lrlink"];
 const NA=["grabid","grablink","shid","shlink"];
 const STICKY=["src","scr","date","week","year","lsrc","sanity"];
+const LOCKABLE=["src","scr","lsrc","city","reg","prio"];
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const $=id=>document.getElementById(id);
 let hist=[];
+let locked=new Set();
 
 // ---- Bangun form ----
 const form=$("form");
@@ -123,7 +131,17 @@ Object.keys(SEC).forEach(s=>{
   const g=document.createElement("div");g.className="grid";
   FIELDS.filter(f=>f[4]===s).forEach(([k,l,t,o,,w])=>{
     const d=document.createElement("div");d.className="f"+(w?" w2":"");
-    const lb=document.createElement("label");lb.htmlFor=k;lb.textContent=l;d.appendChild(lb);
+    // Label row — tambah tombol lock kalau field masuk LOCKABLE
+    if(LOCKABLE.includes(k)){
+      const row=document.createElement("div");row.className="lbl-row";
+      const lb=document.createElement("label");lb.htmlFor=k;lb.textContent=l;row.appendChild(lb);
+      const btn=document.createElement("button");btn.type="button";btn.className="lock-btn";btn.id="lock_"+k;
+      btn.title="Klik untuk lock/unlock field ini";btn.textContent="🔓";
+      btn.onclick=()=>toggleLock(k);
+      row.appendChild(btn);d.appendChild(row);
+    } else {
+      const lb=document.createElement("label");lb.htmlFor=k;lb.textContent=l;d.appendChild(lb);
+    }
     let el;
     if(t==="sel"){el=document.createElement("select");o.forEach(v=>{const op=document.createElement("option");op.value=v;op.textContent=v||"—";el.appendChild(op);});}
     else{el=document.createElement("input");el.type=t==="date"?"date":"text";el.autocomplete="off";if(t==="city")el.setAttribute("list","cl");}
@@ -142,13 +160,57 @@ Object.keys(SEC).forEach(s=>{
 const dl=document.createElement("datalist");dl.id="cl";CITIES.forEach(c=>{const o=document.createElement("option");o.value=c;dl.appendChild(o);});document.body.appendChild(dl);
 
 // ---- Penyimpanan ringan (opsional) ----
-function load(){try{const s=JSON.parse(localStorage.getItem("leads_sticky")||"{}");STICKY.forEach(k=>{if(s[k]!==undefined)$(k).value=s[k];});hist=JSON.parse(localStorage.getItem("leads_hist")||"[]");}catch(e){}}
-function save(){try{const s={};STICKY.forEach(k=>s[k]=$(k).value);localStorage.setItem("leads_sticky",JSON.stringify(s));localStorage.setItem("leads_hist",JSON.stringify(hist));}catch(e){}}
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem("leads_sticky")||"{}");
+    STICKY.forEach(k=>{if(s[k]!==undefined)$(k).value=s[k];});
+    hist=JSON.parse(localStorage.getItem("leads_hist")||"[]");
+    const lk=JSON.parse(localStorage.getItem("leads_locked")||"[]");
+    lk.forEach(k=>{locked.add(k);applyLockUI(k,true);});
+  }catch(e){}
+}
+function save(){
+  try{
+    const s={};STICKY.forEach(k=>s[k]=$(k).value);
+    localStorage.setItem("leads_sticky",JSON.stringify(s));
+    localStorage.setItem("leads_hist",JSON.stringify(hist));
+    localStorage.setItem("leads_locked",JSON.stringify([...locked]));
+  }catch(e){}
+}
 
 // ---- Logika otomatis ----
-function onDate(){const v=$("date").value;if(!v)return;const[y,m,d]=v.split("-").map(Number);$("year").value=y;$("week").value="W"+Math.ceil(d/7)+" "+MON[m-1];}
+function onDate(){/* week/year diisi dari tanggal input, bukan date posting */}
+function initWeekYear(){const t=new Date();const y=t.getFullYear();const d=t.getDate();const mon=MON[t.getMonth()];$("year").value=y;$("week").value="W"+Math.ceil(d/7)+" "+mon;}
+
+// ---- Lock / unlock field ----
+function applyLockUI(k,isLocked){
+  const btn=$("lock_"+k);const el=$(k);
+  if(btn){btn.textContent=isLocked?"🔒":"🔓";btn.classList.toggle("locked",isLocked);}
+  if(el){el.classList.toggle("locked-field",isLocked);}
+}
+function toggleLock(k){
+  if(locked.has(k)){locked.delete(k);applyLockUI(k,false);}
+  else{locked.add(k);applyLockUI(k,true);}
+  save();
+}
 function onCity(){const c=$("city").value.trim().toUpperCase();const k=ALIAS[c]||c;const r=REF[k];
-  if(r){$("reg").value=r[0];$("prio").value=r[1];}
+  if(r)$("reg").value=r[0]; // set region dari kota
+  updatePriority(); // priority ditentukan terpisah
+}
+function updatePriority(){
+  const src=$("lsrc").value;
+  if(src==="ME Scraping - Premium Leads"){
+    // Priority berdasarkan jumlah Google Review
+    const rev=parseInt($("grev").value)||0;
+    if(rev>=500)$("prio").value="P0";
+    else if(rev>=100)$("prio").value="P1";
+    else if(rev>=50)$("prio").value="P2";
+    else $("prio").value="";
+  } else {
+    // Priority berdasarkan kota (tabel REF)
+    const c=$("city").value.trim().toUpperCase();const k=ALIAS[c]||c;const r=REF[k];
+    if(r)$("prio").value=r[1];
+  }
 }
 function coords(){const m=$("coord").value.match(/-?\d+(?:\.\d+)?/g);return m&&m.length>=2?[m[0],m[1]]:null;}
 
@@ -263,7 +325,14 @@ async function copy(text){
 }
 function say(t,ok){const m=$("msg");m.textContent=t;m.className="hint"+(ok?" ok":"");}
 
-function clearForm(){FIELDS.forEach(f=>{if(!STICKY.includes(f[0])){$(f[0]).value=f[2]==="sel"?(f[0]==="sanity"?"Virgin":f[3][0]):"";}});render();$("name").focus();}
+function clearForm(){
+  FIELDS.forEach(f=>{
+    if(!STICKY.includes(f[0])&&!locked.has(f[0])){
+      $(f[0]).value=f[2]==="sel"?(f[0]==="sanity"?"Virgin":f[3][0]):"";
+    }
+  });
+  render();$("name").focus();
+}
 
 $("copy1").onclick=async()=>{const ok=await copy($("out").value);say(ok?"Tersalin. Paste di kolom F pada baris kosong.":"Gagal menyalin otomatis — pilih teks di kotak lalu Ctrl+C.",ok);};
 $("add").onclick=async()=>{
@@ -281,6 +350,7 @@ form.addEventListener("input",e=>{
   if(e.target.id==="date")onDate();
   if(e.target.id==="city")onCity();
   if(e.target.id==="gmaps")onGmaps();
+  if(e.target.id==="lsrc"||e.target.id==="grev")updatePriority();
   if(STICKY.includes(e.target.id))save();
   render();
 });
@@ -288,7 +358,7 @@ form.addEventListener("input",e=>{
 $("gmaps").addEventListener("paste",()=>setTimeout(onGmaps,50));
 load();if(!$("sanity").value)$("sanity").value="Virgin";
 if(!$("date").value){$("date").value=new Date().toISOString().slice(0,10);}
-onDate();render();
+initWeekYear();render();
 </script>
 <footer class="footer">&copy; <script>document.write(new Date().getFullYear())</script> Muhammad Dzaki Salman. All rights reserved.</footer>
 </body>

@@ -621,6 +621,18 @@
     }
     function say(t, ok) { const m = $("msg"); m.textContent = t; m.className = "hint" + (ok ? " ok" : ""); }
 
+    // ---- Auto-parse Grab ID dari Grab Link ----
+    function onGrabLink() {
+      const url = $("grablink").value.trim();
+      if (!url) return;
+      // Ambil path terakhir sebelum query string, cocokkan pola ID Grab: angka-HURUF
+      const m = url.match(/\/(\d+-[A-Z0-9]+)(?:[?#]|$)/);
+      if (m && !$("grabid").value.trim()) {
+        $("grabid").value = m[1];
+        render();
+      }
+    }
+
     function clearForm() {
       FIELDS.forEach(f => {
         if (!STICKY.includes(f[0]) && !locked.has(f[0])) {
@@ -646,12 +658,14 @@
       if (e.target.id === "date") onDate();
       if (e.target.id === "city") onCity();
       if (e.target.id === "gmaps") onGmaps();
+      if (e.target.id === "grablink") onGrabLink();
       if (e.target.id === "lsrc" || e.target.id === "grev") updatePriority();
       if (STICKY.includes(e.target.id)) save();
       render();
     });
-    // Juga handle paste event khusus untuk gmaps
+    // Juga handle paste event khusus untuk gmaps & grablink
     $("gmaps").addEventListener("paste", () => setTimeout(onGmaps, 50));
+    $("grablink").addEventListener("paste", () => setTimeout(onGrabLink, 50));
     load(); if (!$("sanity").value) $("sanity").value = "Virgin";
     if (!$("date").value) { $("date").value = new Date().toISOString().slice(0, 10); }
     initWeekYear(); render();

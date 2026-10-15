@@ -625,8 +625,8 @@
     function onGrabLink() {
       const url = $("grablink").value.trim();
       if (!url) return;
-      // Ambil path terakhir sebelum query string, cocokkan pola ID Grab: angka-HURUF
-      const m = url.match(/\/(\d+-[A-Z0-9]+)(?:[?#]|$)/);
+      // Ambil ID Grab: setelah "/" atau "--" sebelum query string. Pola: angka-HURUFBESAR
+      const m = url.match(/(?:\/|--)(\d+-[A-Z0-9]+)(?:[?#]|$)/);
       if (m && !$("grabid").value.trim()) {
         $("grabid").value = m[1];
         render();
